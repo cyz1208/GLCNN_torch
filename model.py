@@ -131,7 +131,7 @@ def test(model, test_loader, metric_fn, metric_fn_DA):
 			# sum test loss of all mini-batches
 			test_metric += metric_fn(outputs, labels).item()
 			test_metric_DA = torch.concat((test_metric_DA,
-			                                 metric_fn_DA(outputs.reshape(-1, 20).mean(axis=-1), y_origin)))
+			                               metric_fn_DA(outputs.reshape(-1, 20).mean(axis=-1), y_origin)))
 
 	test_metric_DA = test_metric_DA.mean()
 
@@ -193,7 +193,7 @@ if __name__ == "__main__":
 	best_metric = float("inf")
 	for epoch in range(EPOCH):
 		train_loss, train_metric, train_time = train_one_epoch(net, train_loader, loss_fn,
-																metric_fn, optimizer, scheduler)
+		                                                       metric_fn, optimizer, scheduler)
 		val_metric, val_metric_DA, val_time = test(net, val_loader, metric_fn, metric_fn_DA)
 
 		print("epoch: {} train loss: {:.3f}, train_metric: {:.3f}, val metric: {:.3f}, val metric DA: {:.3f},"
