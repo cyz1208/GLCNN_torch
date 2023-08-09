@@ -95,15 +95,15 @@ def loader():
 
     # split train, val, test set index
     len_data = 3132
-    train_ratio, test_ratio = 0.8, 0.2
+    train_ratio, val_ratio, test_ratio = 0.8, 0.1, 0.1
     raw_idx = np.array(list(range(len_data)))
     train_idx, test_idx = train_test_split(raw_idx, test_size=test_ratio, random_state=2022)
-    # val_idx, test_idx = train_test_split(test_idx, test_size=test_ratio / (val_ratio + test_ratio), random_state=123)
+    val_idx, test_idx = train_test_split(test_idx, test_size=test_ratio / (val_ratio + test_ratio), random_state=2022)
     # print(len(train_idx), len(val_idx), len(test_idx))
 
     # augment set index
     train_idx = aug_idx(train_idx)
-    # val_idx = aug_idx(val_idx)
+    val_idx = aug_idx(val_idx)
     test_idx = aug_idx(test_idx)
     # print(len(train_idx), len(val_idx), len(test_idx))
 
@@ -115,29 +115,30 @@ def loader():
 
     # create sampler
     train_sampler = SubsetRandomSampler(train_idx)
-    # val_sampler = SubsetRandomSampler(val_idx)
+    val_sampler = MySubsetSampler(val_idx)
     # test_sampler = SubsetRandomSampler(test_idx)
     test_sampler = MySubsetSampler(test_idx)
 
     # create data loader
     train_loader = DataLoader(dataset, batch_size=256, shuffle=False, sampler=train_sampler,
-                              num_workers=2, pin_memory=True)
-    # val_loader = DataLoader(dataset, batch_size=len(val_sampler), shuffle=False, sampler=val_sampler,
-    #                         num_workers=4, pin_memory=True)
-    test_loader = DataLoader(dataset, batch_size=400, shuffle=False, sampler=test_sampler,
-                             num_workers=2, pin_memory=True)
+                              num_workers=4, pin_memory=True)
+    val_loader = DataLoader(dataset, batch_size=len(val_sampler), shuffle=False, sampler=val_sampler,
+                            num_workers=4, pin_memory=True)
+    test_loader = DataLoader(dataset, batch_size=len(test_sampler), shuffle=False, sampler=test_sampler,
+                             num_workers=4, pin_memory=True)
     print("DONE.")
-    return train_loader, test_loader
+    return train_loader, val_loader, test_loader
 
 
 if __name__ == "__main__":
-    train_loader, test_loader = loader()
-    print(f"len of train and test loader: {len(train_loader)}, {len(test_loader)}")
+    train_loader, val_loader, test_loader = loader()
+    print(f"len of train, val, test loader: {len(train_loader)}, {len(val_loader)}, {len(test_loader)}")
     for i, data in enumerate(test_loader):
         images, fea, labels = data
         print(f"shape of image, descriptor and label: {images.shape}, {fea.shape}, {labels.shape}")
-        # print(labels)
-        # exit()
+        print(f"type of image, descriptor and label: {type(images)}, {type(fea)}, {type(labels)}")
+        print(labels.flatten()[::20])
+        exit()
 
 
 
