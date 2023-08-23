@@ -1,4 +1,4 @@
-mesh,add_N,sub,metal,E_ads_H
+mesh,add_N,sub,metal,property
 42,0N,SV,Sc,-0.910419999999988
 42,0N,SV,Ti,-1.00936999999999
 42,0N,SV,V,-1.31019000000003

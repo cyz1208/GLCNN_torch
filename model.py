@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import time
 import torch.nn as nn
@@ -19,11 +21,11 @@ class Net(nn.Module):
 		self.Lenet5_conv_part = nn.Sequential(
 			nn.Conv2d(6, 6, (5, 5)),
 			nn.MaxPool2d(2, 2),
-			nn.BatchNorm2d(6),
+			nn.BatchNorm2d(6, affine=False),
 			nn.ReLU(),
 			nn.Conv2d(6, 16, (5, 5)),
 			nn.MaxPool2d(2, 2),
-			nn.BatchNorm2d(16),
+			nn.BatchNorm2d(16, affine=False),
 			nn.ReLU(),
 			nn.Conv2d(16, 120, (5, 5)),
 		)
@@ -74,7 +76,7 @@ def train_one_epoch(model, train_loader, loss_fn, metric_fn, optimizer, schedule
 		input_1, input_2, labels = data
 
 		# transfer data to gpu
-		input_1, input_2, labels = input_1.to(device), input_2.to(device), labels.to(device)
+		# input_1, input_2, labels = input_1.to(device), input_2.to(device), labels.to(device)
 
 		# zero the parameter gradients
 		optimizer.zero_grad()
@@ -117,12 +119,12 @@ def test(model, test_loader, metric_fn, metric_fn_DA):
 	# model inference
 	with torch.no_grad():
 		test_metric = 0.0
-		test_metric_DA = torch.Tensor([]).to(device)   # MAE using DA
+		test_metric_DA = 0.0   # MAE using DA
 		for data in test_loader:
 			input_1, input_2, labels = data
 
 			# transfer data to gpu
-			input_1, input_2, labels = input_1.to(device), input_2.to(device), labels.to(device)
+			# input_1, input_2, labels = input_1.to(device), input_2.to(device), labels.to(device)
 			y_origin = labels.flatten()[::20]
 
 			# get predicted values
@@ -130,14 +132,11 @@ def test(model, test_loader, metric_fn, metric_fn_DA):
 
 			# sum test loss of all mini-batches
 			test_metric += metric_fn(outputs, labels).item()
-			test_metric_DA = torch.concat((test_metric_DA,
-			                               metric_fn_DA(outputs.reshape(-1, 20).mean(axis=-1), y_origin)))
-
-	test_metric_DA = test_metric_DA.mean()
+			test_metric_DA += metric_fn_DA(outputs.reshape(-1, 20).mean(axis=-1), y_origin).mean().item()
 
 	end_time = time.perf_counter()
 	# return test loss and time
-	return test_metric / len(test_loader), test_metric_DA, end_time - start_time
+	return test_metric / len(test_loader), test_metric_DA / len(test_loader), end_time - start_time
 
 
 # class Scheduler(LRScheduler):
@@ -159,12 +158,13 @@ if __name__ == "__main__":
 	INIT_LR = 0.0001
 	MAX_LR = 0.001
 	DECAY_LR = -0.015
-	EPOCH = 2
+	EPOCH = 200
 
+	np.set_printoptions(suppress=True)
 	# determine if any gpus is available
 	device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 	# device = torch.device("cpu")
-	print(device)
+	print(f"device: {device}")
 
 	# transfer net to gpu
 	net = Net().to(device)

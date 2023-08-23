@@ -1,17 +1,14 @@
-import networkx as nx
-import numpy as np
-from pymatgen.io.vasp.inputs import Poscar
-from pymatgen.core.periodic_table import Element
+import argparse
 import os
 import pickle
 import warnings
+
+import networkx as nx
+import numpy as np
+from pymatgen.core.periodic_table import Element
+from pymatgen.io.vasp.inputs import Poscar
+
 from get_features import features
-import argparse
-from sklearn.preprocessing import scale
-
-
-warnings.filterwarnings("ignore")
-np.set_printoptions(suppress=True)
 
 substrates = ['SV', 'SV_1N', 'SV_2N', 'SV_3N',
               'DV', 'DV_1N', 'DV_2N_1', 'DV_2N_2', 'DV_3N', 'DV_4N',
@@ -37,8 +34,6 @@ class Utils:
 	@staticmethod
 	def draw_graph(g):
 		nx.draw_networkx(g, pos=nx.spring_layout(g))
-
-	# plt.show()
 
 	@staticmethod
 	def load_graphs(filename):
@@ -110,6 +105,32 @@ class Utils:
 			fea = np.zeros(5)
 		return np.concatenate((feature, fea), axis=0)
 
+	@staticmethod
+	def get_shell_laplacian(graph: nx.Graph, depth: int = 1):
+		"""
+		update nodes using normalized laplacian matrix.
+		Args:
+			graph:
+			depth:
+		Returns:
+			list of result of graph.
+		"""
+		fea_2 = np.asfarray(graph.nodes[graph.number_of_nodes() - 1]['feature_2'].split())
+		fea_1 = np.array([np.asfarray(graph.nodes()[i]["feature"].split()) for i in range(graph.number_of_nodes())])
+
+		norm_laplacian = nx.normalized_laplacian_matrix(graph).toarray()
+
+		# adj = networkx.adjacency_matrix(graph).toarray()
+		# degree = np.diag(np.sum(adj, axis=-1))
+		# adj = np.add(adj, np.diag(np.ones_like(adj[0])))
+		# degree, adj = torch.Tensor(degree), torch.Tensor(adj)
+		# D_inverse_sqrt = degree.inverse().sqrt()
+		# norm_laplacian = D_inverse_sqrt.matmul(adj).matmul(D_inverse_sqrt)
+
+		for i in range(depth):
+			fea_1 = np.dot(norm_laplacian, fea_1)
+		return np.concatenate((fea_2, fea_1[-1]), axis=0)
+
 
 def generate_graph(name, filepath, demo=True):
 	"""
@@ -137,27 +158,14 @@ def generate_graph(name, filepath, demo=True):
 	return g
 
 
-def save_graph_feature(feature, data_path, filename):
-	"""
-	save one feature as pickle file
-	Args:
-		feature: 1-D array
-		data_path: dir path that saves data
-		filename: {id}, i.e., 0
-	"""
-	with open(os.path.join(data_path, f"fea_{filename}.pkl"), "wb") as f:
-		pickle.dump(feature, f)
-
-
 def demo_graphs():
 	"""
 	return list of graphs G using demo catalysts
 	"""
 	root_dir = os.getcwd()
-	data_dir = os.path.join(root_dir, "data/descriptor")
 	catalysts_dir = os.path.join(root_dir, "demo_catalysts")
 
-	idx_image = 0
+	G = []
 	for mesh in meshs:
 		file_path_1 = os.path.join(catalysts_dir, mesh)
 		if not os.path.exists(file_path_1):
@@ -175,11 +183,13 @@ def demo_graphs():
 					if not os.path.exists(file_path_4):
 						continue
 					print(f"now processing: {file_path_4}")
+
 					g = generate_graph(f"{mesh} {add_N} {sub} {e}", file_path_4, demo=True)
-					graph_feature = Utils.get_shells(g)
-					# graph_feature = scale(graph_feature)
-					save_graph_feature(graph_feature, data_dir, idx_image)
-					idx_image += 1
+					G.append(g)
+	print(f"total graphs: {len(G)}")
+
+	with open(os.path.join(root_dir, "demo_data/graphs.pkl"), "wb") as f:
+		pickle.dump(G, f)
 	print("DONE")
 
 
@@ -188,27 +198,32 @@ def user_graphs():
 	return list of graphs G using user catalysts
 	"""
 	root_dir = os.getcwd()
-	data_dir = os.path.join(root_dir, "data/descriptor")
 	catalysts_dir = os.path.join(root_dir, "user_catalysts")
 	catalysts = [i for i in os.listdir(catalysts_dir) if "POSCAR" in i]
 
-	idx_image = 0
+	G = []
 	for cat in catalysts:
 		print(f"now processing: {os.path.join(catalysts_dir, cat)}")
 		g = generate_graph(cat, os.path.join(catalysts_dir, cat), demo=False)
-		graph_feature = Utils.get_shells(g)
-		# graph_feature = scale(graph_feature)
-		save_graph_feature(graph_feature, data_dir, idx_image)
-		idx_image += 1
+		G.append(g)
+	print(f"total graphs: {len(G)}")
+
+	with open(os.path.join(root_dir, "user_data/graphs.pkl"), "wb") as f:
+		pickle.dump(G, f)
 	print("DONE")
 
 
 if __name__ == '__main__':
+	os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+	warnings.filterwarnings("ignore")
+	np.set_printoptions(suppress=True)
+
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--demo", action="store_true", help="whether use demo catalysts")
+	parser.add_argument("--demo", action="store_true", help="use demo catalysts")
 	args = parser.parse_args()
 
 	if args.demo:
 		demo_graphs()
 	else:
 		user_graphs()
+
