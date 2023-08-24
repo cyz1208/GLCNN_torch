@@ -119,8 +119,8 @@ class PixelImageInMemoryDataset(Dataset):
         for _, datum in df.iterrows():
             # data clean
             if demo:
-                if df.columns and [datum['mesh'], datum['add_N'], datum['sub'],
-                                   datum['metal']] not in clean_name:
+                if [datum['mesh'], datum['add_N'], datum['sub'],
+                        datum['metal']] not in clean_name:
                     self.properties.append(datum['property'])
             else:
                 self.properties.append(datum['property'])
@@ -217,30 +217,22 @@ def loader(demo):
     #                             )
 
     dataset = PixelImageInMemoryDataset(
-        os.path.join(
-            root_dir,
-            data_dir,
-            "pixels.pkl"),
-        os.path.join(
-            root_dir,
-            data_dir,
-            "graphs.pkl"),
-        os.path.join(
-            root_dir,
-            data_dir,
-            "properties.csv"),
+        os.path.join(root_dir, data_dir, "pixels.pkl"),
+        os.path.join(root_dir, data_dir, "graphs.pkl"),
+        os.path.join(root_dir, data_dir, "properties.csv"),
         demo=demo,
     )
 
     # split train, val, test set index
     len_data = dataset.origin_length
-    train_ratio, val_ratio, test_ratio = 0.80, 0.10, 0.10
+    train_ratio, val_ratio, test_ratio = 0.8, 0.1, 0.1
     raw_idx = np.array(list(range(len_data)))
     train_idx, test_idx = train_test_split(
         raw_idx, train_size=train_ratio, random_state=None)
     val_idx, test_idx = train_test_split(
         test_idx, test_size=test_ratio / (val_ratio + test_ratio), random_state=None)
-    # print(len(train_idx), len(val_idx), len(test_idx))
+    print(
+        f"length of train, val and test set: {len(train_idx)}, {len(val_idx)}, {len(test_idx)}")
 
     # augment set index
     train_idx = aug_idx(train_idx)

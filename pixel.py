@@ -160,7 +160,7 @@ def pixel(filepath, size=(128, 128, 6), grid=0.20, sigma=1.5, demo=True):
         image[int(index_x)][int(index_y)][4] = element.group
         # atomic_radius_calculated
         image[int(index_x)][int(index_y)
-                               ][5] = element.atomic_radius_calculated
+                            ][5] = element.atomic_radius_calculated
 
     # Gaussian filter
     image = add_gaussian_blur(image, sigma=sigma)
