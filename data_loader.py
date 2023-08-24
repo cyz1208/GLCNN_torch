@@ -81,13 +81,23 @@ class PixelImageInMemoryDataset(Dataset):
     InMemory dataset, raw data stored in pixels.pkl, graphs.pkl and properties.csv in data/ folder
     """
 
-    def __init__(self, pixel_dir, graph_dir, property_dir, to_cuda=True, transform=None, target_transform=None):
+    def __init__(
+            self,
+            pixel_dir,
+            graph_dir,
+            property_dir,
+            demo,
+            to_cuda=True,
+            transform=None,
+            target_transform=None):
         print("LOADING data from files ...")
         clean_name = data_clean('./structure.log')
 
         with open(pixel_dir, "rb") as f:
-            self.pixels = np.array([pixel for name, pixel in pkl.load(f) if name.split() not in clean_name])
-        self.pixels = np.transpose(self.pixels, (0, 3, 1, 2))   # channel last to channel first
+            self.pixels = np.array(
+                [pixel for name, pixel in pkl.load(f) if name.split() not in clean_name])
+        # channel last to channel first
+        self.pixels = np.transpose(self.pixels, (0, 3, 1, 2))
         self.pixels = torch.Tensor(self.pixels)
         print(f"total pixels shape: {self.pixels.shape}")
 
@@ -108,7 +118,11 @@ class PixelImageInMemoryDataset(Dataset):
         self.properties = []
         for _, datum in df.iterrows():
             # data clean
-            if [datum['mesh'], datum['add_N'], datum['sub'], datum['metal']] not in clean_name:
+            if demo:
+                if df.columns and [datum['mesh'], datum['add_N'], datum['sub'],
+                                   datum['metal']] not in clean_name:
+                    self.properties.append(datum['property'])
+            else:
                 self.properties.append(datum['property'])
         self.properties = data_augmentation_y(self.properties).reshape((-1, 1))
         self.properties = torch.Tensor(self.properties)
@@ -118,7 +132,8 @@ class PixelImageInMemoryDataset(Dataset):
         self.target_transform = target_transform
 
         if to_cuda:
-            device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            device = torch.device(
+                "cuda:0" if torch.cuda.is_available() else "cpu")
             self.pixels, self.graphs, self.properties = (
                 self.pixels.to(device), self.graphs.to(device), self.properties.to(device))
 
@@ -185,7 +200,7 @@ def aug_idx(idx, aug=20):
     return idx_new
 
 
-def loader():
+def loader(demo):
     """
     load train, val and test data
 
@@ -194,23 +209,37 @@ def loader():
     """
     print("LOADING DATA ...")
     root_dir = os.getcwd()
+    data_dir = "demo_data" if demo else "user_data"
 
     # usage of custom dataset
     # dataset = PixelImageDataset(os.path.join(root_dir, "data/id_prop.csv"),
     #                             os.path.join(root_dir, "data"),
     #                             )
 
-    dataset = PixelImageInMemoryDataset(os.path.join(root_dir, "user_data/pixels.pkl"),
-                                        os.path.join(root_dir, "user_data/graphs.pkl"),
-                                        os.path.join(root_dir, "user_data/properties.csv"),
-                                        )
+    dataset = PixelImageInMemoryDataset(
+        os.path.join(
+            root_dir,
+            data_dir,
+            "pixels.pkl"),
+        os.path.join(
+            root_dir,
+            data_dir,
+            "graphs.pkl"),
+        os.path.join(
+            root_dir,
+            data_dir,
+            "properties.csv"),
+        demo=demo,
+    )
 
     # split train, val, test set index
     len_data = dataset.origin_length
-    train_ratio, val_ratio, test_ratio = 0.8, 0.1, 0.1
+    train_ratio, val_ratio, test_ratio = 0.80, 0.10, 0.10
     raw_idx = np.array(list(range(len_data)))
-    train_idx, test_idx = train_test_split(raw_idx, test_size=test_ratio, random_state=None)
-    val_idx, test_idx = train_test_split(test_idx, test_size=test_ratio / (val_ratio + test_ratio), random_state=None)
+    train_idx, test_idx = train_test_split(
+        raw_idx, train_size=train_ratio, random_state=None)
+    val_idx, test_idx = train_test_split(
+        test_idx, test_size=test_ratio / (val_ratio + test_ratio), random_state=None)
     # print(len(train_idx), len(val_idx), len(test_idx))
 
     # augment set index
@@ -226,22 +255,40 @@ def loader():
     test_sampler = MySubsetSampler(test_idx)
 
     # create data loader
-    train_loader = DataLoader(dataset, batch_size=256, shuffle=False, sampler=train_sampler,
-                              num_workers=0, pin_memory=False)
-    val_loader = DataLoader(dataset, batch_size=len(val_sampler), shuffle=False, sampler=val_sampler,
-                            num_workers=0, pin_memory=False)
-    test_loader = DataLoader(dataset, batch_size=len(test_sampler), shuffle=False, sampler=test_sampler,
-                             num_workers=0, pin_memory=False)
+    train_loader = DataLoader(
+        dataset,
+        batch_size=256,
+        shuffle=False,
+        sampler=train_sampler,
+        num_workers=0,
+        pin_memory=False)
+    val_loader = DataLoader(
+        dataset,
+        batch_size=len(val_sampler),
+        shuffle=False,
+        sampler=val_sampler,
+        num_workers=0,
+        pin_memory=False)
+    test_loader = DataLoader(
+        dataset,
+        batch_size=len(test_sampler),
+        shuffle=False,
+        sampler=test_sampler,
+        num_workers=0,
+        pin_memory=False)
     print("DONE.")
     return train_loader, val_loader, test_loader
 
 
 if __name__ == "__main__":
     train_loader, val_loader, test_loader = loader()
-    print(f"len of train, val, test loader: {len(train_loader)}, {len(val_loader)}, {len(test_loader)}")
+    print(
+        f"len of train, val, test loader: {len(train_loader)}, {len(val_loader)}, {len(test_loader)}")
     for i, data in enumerate(test_loader):
         images, fea, labels = data
-        print(f"shape of image, descriptor and label: {images.shape}, {fea.shape}, {labels.shape}")
-        print(f"type of image, descriptor and label: {type(images)}, {type(fea)}, {type(labels)}")
+        print(
+            f"shape of image, descriptor and label: {images.shape}, {fea.shape}, {labels.shape}")
+        print(
+            f"type of image, descriptor and label: {type(images)}, {type(fea)}, {type(labels)}")
         print(labels.flatten()[::20])
         exit()
